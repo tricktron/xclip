@@ -363,6 +363,7 @@ xcin(Display * dpy,
     static Atom inc;
     static Atom targets;
     static Atom alt_target;
+    static Atom timestamp;
 
     if (!alt_target) {
 	alt_target = XInternAtom(dpy, "STRING", False);
@@ -375,6 +376,10 @@ xcin(Display * dpy,
 
     if (!inc) {
 	inc = XInternAtom(dpy, "INCR", False);
+    }
+
+    if (!timestamp) {
+	timestamp = XInternAtom(dpy, "TIMESTAMP", False);
     }
 
     /* We consider selections larger than a quarter of the maximum
@@ -418,8 +423,8 @@ xcin(Display * dpy,
 
 	/* put the data into a property */
 	if (evt.xselectionrequest.target == targets) {
-	    Atom types[3] = { targets, target, alt_target };
-	    int types_count = alt_txt == NULL ? 2 : 3;
+	    Atom types[4] = { targets, target, timestamp, alt_target };
+	    int types_count = alt_txt == NULL ? 3 : 4;
 
 	    if ( xcverb >= ODEBUG ) {
 		fprintf(stderr, "xclib: debug: sending list of TARGETS\n");
@@ -433,6 +438,21 @@ xcin(Display * dpy,
 			    32, PropModeReplace, (unsigned char *) types,
 			    types_count
 		);
+	}
+	else if (evt.xselectionrequest.target == timestamp) {
+	    if ( xcverb >= ODEBUG ) {
+		fprintf(stderr, "xclib: debug: sending TIMESTAMP\n");
+	    }
+
+	    /* Respond with the ownership timestamp as XA_INTEGER 32-bit.
+	     * TIMESTAMP is a single-shot response, no INCR needed. */
+	    long ts = (long) sel_timestamp;
+	    XChangeProperty(dpy,
+			    *win,
+			    *pty,
+			    XA_INTEGER,
+			    32, PropModeReplace, (unsigned char *) &ts,
+			    1);
 	}
 	else if (evt.xselectionrequest.target == alt_target && alt_txt) {
 	    if ( xcverb >= ODEBUG ) {
@@ -501,6 +521,10 @@ xcin(Display * dpy,
 
 	/* don't treat alternative text request as contents request */
 	if (evt.xselectionrequest.target == alt_target)
+	    return (1);		/* Finished with request */
+
+	/* don't treat TIMESTAMP request as contents request */
+	if (evt.xselectionrequest.target == timestamp)
 	    return (1);		/* Finished with request */
 
 	/* if len <= chunk_size, then the data was sent all at

@@ -24,6 +24,9 @@
 /* global verbosity output level */
 extern int xcverb;
 
+/* ownership timestamp for ICCCM TIMESTAMP target */
+extern Time sel_timestamp;
+
 /* global error flags from xchandler() */
 extern int xcerrflag;
 extern XErrorEvent xcerrevt;

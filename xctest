@@ -61,6 +61,41 @@ else
     echo "PASS: xclip exited correctly after losing selection"
 fi
 
+# test that TARGETS response includes TIMESTAMP when xclip owns a selection
+echo "Testing that TARGETS response includes TIMESTAMP"
+printf '%s' "  xclip -o -sel clipboard -t TARGETS includes TIMESTAMP	"
+echo "test data" | $checker ./xclip -sel clipboard -i
+sleep "$delay"
+actual=$($checker ./xclip -o -sel clipboard -t TARGETS)
+if echo "$actual" | grep -qx TIMESTAMP; then
+    echo "PASS"
+else
+    echo "FAIL: TARGETS output was:"
+    echo "$actual"
+    exit 1
+fi
+
+# test that TIMESTAMP target returns a positive integer, not raw clipboard data
+echo "Testing that TIMESTAMP target returns a positive integer"
+printf '%s' "  xclip -o -sel clipboard -t TIMESTAMP returns a positive integer	"
+echo "test data" | $checker ./xclip -sel clipboard -i
+sleep "$delay"
+actual=$($checker ./xclip -o -sel clipboard -t TIMESTAMP)
+case "$actual" in
+    "" | *[!0-9]*)
+        echo "FAIL: expected a positive integer, got: $actual"
+        exit 1
+        ;;
+    *)
+        if [ "$actual" -gt 0 ]; then
+            echo "PASS"
+        else
+            echo "FAIL: expected a positive integer, got: $actual"
+            exit 1
+        fi
+        ;;
+esac
+
 # temp file names (in and out)
 tempi=`mktemp` || exit 1
 tempo=`mktemp` || exit 1

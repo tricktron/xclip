@@ -55,6 +55,7 @@ static int frmnl = F;		/* remove (single) newline character at the very end if p
 static int fsecm = F;		/* zero out selection buffer before exiting */
 
 Display *dpy;			/* connection to X11 display */
+Time sel_timestamp = CurrentTime;  /* ownership timestamp for ICCCM TIMESTAMP target */
 XrmDatabase opt_db = NULL;	/* database for options */
 
 char **fil_names;		/* names of files to read */
@@ -366,6 +367,26 @@ doOptTarget(void)
     }
 }
 
+/* Acquire a real X server timestamp per ICCCM §2.1:
+ * do a zero-length property append, then wait for PropertyNotify. */
+static Time
+acquire_timestamp(Display *dpy, Window win)
+{
+    Atom ts_atom = XInternAtom(dpy, "XCLIP_TIMESTAMP_PROP", False);
+    XEvent evt;
+
+    XSelectInput(dpy, win, PropertyChangeMask);
+    XChangeProperty(dpy, win, ts_atom, XA_INTEGER, 32, PropModeAppend, NULL, 0);
+    XFlush(dpy);
+    while (1) {
+	XNextEvent(dpy, &evt);
+	if (evt.type == PropertyNotify) {
+	    XDeleteProperty(dpy, win, ts_atom);
+	    return evt.xproperty.time;
+	}
+    }
+}
+
 static int
 doIn(Window win, const char *progname)
 {
@@ -472,8 +493,8 @@ doIn(Window win, const char *progname)
     /* take control of the selection so that we receive
      * SelectionRequest events from other windows
      */
-    /* FIXME: Should not use CurrentTime, according to ICCCM section 2.1 */
-    XSetSelectionOwner(dpy, sseln, win, CurrentTime);
+    sel_timestamp = acquire_timestamp(dpy, win);
+    XSetSelectionOwner(dpy, sseln, win, sel_timestamp);
 
     /* Double-check SetSelectionOwner did not "merely appear to succeed". */
     Window owner = XGetSelectionOwner(dpy, sseln);
